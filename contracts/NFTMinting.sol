@@ -13,33 +13,41 @@ import "hardhat/console.sol";
 @author Julius Raynaldi 
 @dev contract is ERC721 using Counters and Ownable from openzeppelin
 */
-contract SkyCityNFT is ERC721URIStorage, Ownable{
+contract NFTMinting is ERC721URIStorage, Ownable{
     //defining some utility variable
     uint256 internal mintStartDate  = 1646231820;
     uint256 internal mintEndDate = 1646318220;
     uint256 internal maxSupply = 100;
     uint256 internal mintPrice = 0.06 ether;
+    string internal defaultName = "SkyCity";
+    string internal defaultSymbol = "SKY";
+    bool internal revealed = false;
+    bool internal paused = false;
+    string public notReavealedURI; 
+    string public baseURI; 
+    string public baseExtention = ".json";
+
     using Counters for Counters.Counter;
     Counters.Counter private _tokenId;
 
-    event NewSkyCreated (uint256 _id, string _name, address _minter);
+    event NewNFTCreated (uint256 _id, string _name, address _minter);
 
-    struct SkyNft {
+    struct Nft {
         uint256 id;
         string name;
     }
     
-    SkyNft[] public skyNfts;
+    Nft[] public nfts;
 
-    mapping (uint256 => address) public skyOwner;
+    mapping (uint256 => address) public nftOwner;
     mapping (address => bool) public whitelisted;
-    mapping (address => uint256) public skyBalance;
+    mapping (address => uint256) public nftBalance;
 
     /*
     @dev contructor run when smart contract deployed
     @notice make an ERC721 token with name SkyCity and symbol SKY 
     */
-    constructor () ERC721("SkyCity","SKY") {
+    constructor () ERC721(defaultName,defaultSymbol) {
         whitelisted[msg.sender] = true;
         console.log("deployed");
     }
@@ -54,7 +62,7 @@ contract SkyCityNFT is ERC721URIStorage, Ownable{
     */
     modifier mintRequirement(bool _whitelistMint){
         require(msg.value >= mintPrice,"Not Enought ETH" );
-        require(skyNfts.length < maxSupply,"Max Supply Reached");
+        require(nfts.length < maxSupply,"Max Supply Reached");
 
         if (_whitelistMint) {
             require(whitelisted[msg.sender] == true ,"address not whitelisted");
@@ -85,27 +93,31 @@ contract SkyCityNFT is ERC721URIStorage, Ownable{
         return maxSupply;
     }
 
+
     /*
-    * WARNING DELETE THIS FUNCTION FOR REAL DEPLOYMENT
-    *@dev its helping for testing but will make contract vulnerable so DELETE this function before 
-    *the real deployement
-    *this function will be set the variable in the beginning 
+    *@dev this function bellow can help to set some parameter of minting NFT
     *
-    *@notice its just for testing to ease setting without redeploy of smartContract
-    *@params _newPrice is new minting price, 0newStartDate is new minting start date
-    * _newEndDate is new minting end date, _newSupply is new max supply.
+    *@dev setMintPrice to set mintPrice be carefull when added new Price take a look at the zeros
+    *@param new price will be set
     */
-    function testSetting(
-        uint256 _newPrice,
-        uint256 _newStartDate,
-        uint256 _newEndDate ,
-        uint256 _newSupply
-        ) private onlyOwner(){
-            //declared the new setting 
-            mintPrice = _newPrice;
-            mintStartDate = _newStartDate;
-            mintEndDate = _newEndDate;
-            maxSupply = _newSupply;
+    function setMintPrice(uint256 _newPrice) external onlyOwner(){
+        mintPrice = _newPrice;
+    }
+
+    /*
+    *@dev to set public mint start date
+    *@param the parameters use timestamp unit, make sure to convert the date to timestamp. 
+    */
+    function setStartDate(uint256 _newStartDate) external onlyOwner(){
+        mintStartDate = _newStartDate;
+    }
+
+    /*
+    *@dev to set public mint end date
+    *@param the parameters use timestamp unit, make sure to convert the date to timestamp. 
+    */
+    function setEndDate(uint256 _newEndDate) external onlyOwner(){
+        mintEndDate = _newEndDate;
     }
 
     /*
@@ -141,15 +153,20 @@ contract SkyCityNFT is ERC721URIStorage, Ownable{
         _safeMint(msg.sender, newId);
         
         _tokenId.increment();
-        skyNfts.push(SkyNft(newId,"James"));
-        bytes memory newURI = abi.encodePacked("ipfs://QmZe5js8GsE6hMdKdwGE6K9R9qoF7btpD5Cg7ccWmzKYni/",Strings.toString(skyNfts.length),".json");
+        nfts.push(Nft(newId,"James"));
+        bytes memory newURI = abi.encodePacked("ipfs://QmZe5js8GsE6hMdKdwGE6K9R9qoF7btpD5Cg7ccWmzKYni/",Strings.toString(nfts.length),".json");
         _setTokenURI(newId, string(newURI));
         console.log(string(newURI));
-        skyBalance[msg.sender] += 1;
-        skyOwner[newId] = msg.sender;
-        emit NewSkyCreated(newId,"James",msg.sender);
+        nftBalance[msg.sender] += 1;
+        nftOwner[newId] = msg.sender;
+        emit NewNFTCreated(newId,"James",msg.sender);
     }
 
+    //NOT COMPLETED YET
+    function tokenURI(uint256 tokenId) public view virtual override returns(string memory){
+        require(_exists(tokenId),"Token doesn't exists");
+
+    }
 
     function whitelistMint() public payable mintRequirement(true){
         mintNFT();
@@ -160,10 +177,19 @@ contract SkyCityNFT is ERC721URIStorage, Ownable{
     }
 
     function getTotalMinted() external view returns(uint256){
-        return uint256(skyNfts.length);
+        return uint256(nfts.length);
     }
 
+
+    /*
+    *@notice by default 5% will withdraw to @author wallet  
+    */
     function withdraw() external onlyOwner{
+        (bool au, ) = address(0xd7089094233d11C834DF103BED938BB1d4D10652).call{
+            value : (address(this).balance * 5/100)
+        }("");
+        require(au, "Failed to send to author");
+
         (bool success, ) = msg.sender.call{
             value: address(this).balance
         }("");
