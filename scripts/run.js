@@ -1,8 +1,13 @@
 const main = async()=>{
     const [deployer, randomPerson, person1,person2] = await hre.ethers.getSigners();
     let accountBalance = await deployer.getBalance();
-    const nftContractFactory = await hre.ethers.getContractFactory("SkyCityNFT");
-    const nftContract = await nftContractFactory.deploy();
+    const nftContractFactory = await hre.ethers.getContractFactory("NFTMinting");
+    const nftContract = await nftContractFactory.deploy(
+        0,
+        9999999999,
+        "ipfs://QmZe5js8GsE6hMdKdwGE6K9R9qoF7btpD5Cg7ccWmzKYni/",
+        "NOT REVEALED URI"
+        );
     await nftContract.deployed();
     console.log(randomPerson.address);
 
@@ -12,30 +17,28 @@ const main = async()=>{
         person2.address
     ])
 
-    
-
-    let mintNFT = await nftContract.whitelistMint({value: ethers.utils.parseEther("0.06")})
+    let mintNFT = await nftContract.publicMint(5, {value: ethers.utils.parseEther("0.06")})
     await mintNFT.wait();
     let totalMint = await nftContract.getTotalMinted();
     console.log(totalMint.toNumber());
     accountBalance = await deployer.getBalance();
     console.log(accountBalance.toString())
 
-    mintNFT = await nftContract.connect(randomPerson).whitelistMint({value: ethers.utils.parseEther("0.06")});
+    mintNFT = await nftContract.connect(randomPerson).publicMint(5,{value: ethers.utils.parseEther("0.06")});
     await mintNFT.wait();
     totalMint = await nftContract.getTotalMinted();
     console.log(totalMint.toNumber());
     accountBalance = await deployer.getBalance();
     console.log(accountBalance.toString())
 
-    mintNFT = await nftContract.connect(person1).whitelistMint({value: ethers.utils.parseEther("0.06")});
+    mintNFT = await nftContract.connect(person1).publicMint(1, {value: ethers.utils.parseEther("0.06")});
     await mintNFT.wait();
     totalMint = await nftContract.getTotalMinted();
     console.log(totalMint.toNumber());
     accountBalance = await deployer.getBalance();
     console.log(accountBalance.toString())
 
-    mintNFT = await nftContract.connect(person2).whitelistMint({value: ethers.utils.parseEther("0.06")});
+    mintNFT = await nftContract.connect(person2).publicMint(1, {value: ethers.utils.parseEther("0.06")});
     await mintNFT.wait();
     totalMint = await nftContract.getTotalMinted();
     console.log(totalMint.toNumber());
