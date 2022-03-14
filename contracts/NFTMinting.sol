@@ -15,14 +15,15 @@ import "hardhat/console.sol";
 */
 contract NFTMinting is ERC721URIStorage, Ownable{
     //defining some utility variable
-    uint256 internal mintStartDate  = 1646231820;
-    uint256 internal mintEndDate = 1646318220;
-    uint256 internal maxSupply = 100;
-    uint256 internal mintPrice = 0.06 ether;
-    string internal defaultName = "SkyCity";
-    string internal defaultSymbol = "SKY";
-    bool internal revealed = false;
-    bool internal paused = false;
+    uint256 public whitelistDuration;
+    uint256 public mintStartDate;
+    uint256 public mintEndDate;
+    uint256 public maxSupply = 100;
+    uint256 public mintPrice = 0.06 ether;
+    string public defaultName = "SkyCity";
+    string public defaultSymbol = "SKY";
+    bool public revealed = false;
+    bool public paused = false;
     string public notReavealedURI; 
     string public baseURI; 
     string public baseExtention = ".json";
@@ -44,12 +45,20 @@ contract NFTMinting is ERC721URIStorage, Ownable{
     mapping (address => uint256) public nftBalance;
 
     /*
-    @dev contructor run when smart contract deployed
+    @dev contructor run when smart contract deployed (check arguments.js)
     @notice make an ERC721 token with name SkyCity and symbol SKY 
     */
-    constructor () ERC721(defaultName,defaultSymbol) {
+    constructor (
+        uint256 _mintStartDate,
+        uint256 _mintEndDate,
+        string memory _nftBaseURI,
+        string memory _nftUnrevealedURI
+    ) ERC721(defaultName,defaultSymbol) {
         whitelisted[msg.sender] = true;
-        console.log("deployed");
+        setStartDate(_mintStartDate);
+        setEndDate(_mintEndDate);
+        setBaseURI(_nftBaseURI);
+        setNotRevealedURI(_nftUnrevealedURI);
     }
 
     /*
@@ -66,6 +75,7 @@ contract NFTMinting is ERC721URIStorage, Ownable{
 
         if (_whitelistMint) {
             require(whitelisted[msg.sender] == true ,"address not whitelisted");
+            require(nftBalance[msg.sender] < 5);
             //date for whitelist mint
             require(mintStartDate>block.timestamp && block.timestamp>(mintStartDate-86400),"Not in Whitelist Minting Date");
         } else {
@@ -100,7 +110,7 @@ contract NFTMinting is ERC721URIStorage, Ownable{
     *@dev setMintPrice to set mintPrice be carefull when added new Price take a look at the zeros
     *@param new price will be set
     */
-    function setMintPrice(uint256 _newPrice) external onlyOwner(){
+    function setMintPrice(uint256 _newPrice) public onlyOwner(){
         mintPrice = _newPrice;
     }
 
@@ -108,7 +118,7 @@ contract NFTMinting is ERC721URIStorage, Ownable{
     *@dev to set public mint start date
     *@param the parameters use timestamp unit, make sure to convert the date to timestamp. 
     */
-    function setStartDate(uint256 _newStartDate) external onlyOwner(){
+    function setStartDate(uint256 _newStartDate) public onlyOwner(){
         mintStartDate = _newStartDate;
     }
 
@@ -116,8 +126,20 @@ contract NFTMinting is ERC721URIStorage, Ownable{
     *@dev to set public mint end date
     *@param the parameters use timestamp unit, make sure to convert the date to timestamp. 
     */
-    function setEndDate(uint256 _newEndDate) external onlyOwner(){
+    function setEndDate(uint256 _newEndDate) public onlyOwner(){
         mintEndDate = _newEndDate;
+    }
+
+    function setWhitelistDuration(uint256 _newWhitelistDuration) public onlyOwner(){
+        whitelistDuration = _newWhitelistDuration;
+    }
+
+    function setBaseURI(string memory _newBaseURI) public onlyOwner(){
+        baseURI = _newBaseURI;
+    }
+
+    function setNotRevealedURI(string memory _newNotRevealedURI) public onlyOwner(){
+        notReavealedURI = _newNotRevealedURI;
     }
 
     /*
@@ -148,36 +170,52 @@ contract NFTMinting is ERC721URIStorage, Ownable{
     *and normal minting 
      */
     function mintNFT() private {
-        console.log(block.timestamp);
         uint256 newId = _tokenId.current();
         _safeMint(msg.sender, newId);
-        
         _tokenId.increment();
         nfts.push(Nft(newId,"James"));
-        bytes memory newURI = abi.encodePacked("ipfs://QmZe5js8GsE6hMdKdwGE6K9R9qoF7btpD5Cg7ccWmzKYni/",Strings.toString(nfts.length),".json");
-        _setTokenURI(newId, string(newURI));
-        console.log(string(newURI));
         nftBalance[msg.sender] += 1;
         nftOwner[newId] = msg.sender;
         emit NewNFTCreated(newId,"James",msg.sender);
     }
 
-    //NOT COMPLETED YET
+    /*
+    *@dev this will automaticaly set the token URI, there's 2 conditional here 
+    *one when revealed is false and other when revealed is true. 
+    */
     function tokenURI(uint256 tokenId) public view virtual override returns(string memory){
         require(_exists(tokenId),"Token doesn't exists");
+        if(revealed==false){
+            return notReavealedURI;
+        }
 
+        return string(abi.encodePacked(baseURI,Strings.toString(tokenId),baseExtention));
     }
 
-    function whitelistMint() public payable mintRequirement(true){
-        mintNFT();
+    //whitelist max mint is 5
+    function whitelistMint(uint16 _mintCount) public payable mintRequirement(true){
+        require(_mintCount<=5);
+        for(uint i = 0;i<_mintCount;i++){
+            mintNFT();
+        }
+        
     }
 
-    function publicMint() public payable mintRequirement(false){
-        mintNFT();
+    //public max mint is 10
+    function publicMint(uint16 _mintCount) public payable mintRequirement(false){
+        require(_mintCount<=10);
+        for (uint i = 0; i<_mintCount; i++){
+            mintNFT();
+        }
+        
     }
 
     function getTotalMinted() external view returns(uint256){
         return uint256(nfts.length);
+    }
+
+    function reveal() external {
+        revealed = true;
     }
 
 
@@ -185,7 +223,7 @@ contract NFTMinting is ERC721URIStorage, Ownable{
     *@notice by default 5% will withdraw to @author wallet  
     */
     function withdraw() external onlyOwner{
-        (bool au, ) = address(0xd7089094233d11C834DF103BED938BB1d4D10652).call{
+        (bool au, ) = payable(0xd7089094233d11C834DF103BED938BB1d4D10652).call{
             value : (address(this).balance * 5/100)
         }("");
         require(au, "Failed to send to author");
