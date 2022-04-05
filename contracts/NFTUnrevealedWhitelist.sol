@@ -5,7 +5,6 @@ pragma solidity ^0.8.4;
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "hardhat/console.sol";
 
 /*
 @title A contract to mint NFTs
@@ -122,9 +121,9 @@ contract NFTMinting is ERC721URIStorage, Ownable{
         mintStartDate = _newStartDate;
     }
 
-    /*
+    /**
     *@dev to set public mint end date
-    *@param the parameters use timestamp unit, make sure to convert the date to timestamp. 
+    *@param _newEndDate parameters use timestamp unit, make sure to convert the date to timestamp. 
     */
     function setEndDate(uint256 _newEndDate) public onlyOwner(){
         mintEndDate = _newEndDate;
